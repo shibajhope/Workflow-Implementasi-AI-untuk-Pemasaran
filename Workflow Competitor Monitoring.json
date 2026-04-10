@@ -1,0 +1,514 @@
+{
+  "name": "Workflow Competitor Monitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -672,
+        -48
+      ],
+      "id": "4a9fd8b1-2b99-4af7-8ed9-57daa426d2ac",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"q\": \"\\\"NF Academy\\\" OR \\\"Nurul Fikri Academy\\\"\", \"gl\": \"id\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -336,
+        -288
+      ],
+      "id": "830383c4-ce62-414e-bf5a-3c4926946955",
+      "name": "NFA",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q4HRlJypEw5XAn8H",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"q\": \"\\\"BISA AI\\\"\", \"gl\": \"id\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -336,
+        -48
+      ],
+      "id": "c9577fc7-f9f4-4d2f-bb4f-7edd01717f20",
+      "name": "Bisa AI",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q4HRlJypEw5XAn8H",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"q\": \"\\\"Vinix 7\\\"\", \"gl\": \"id\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -336,
+        192
+      ],
+      "id": "500b9da0-a413-436b-850e-1bd21a29a966",
+      "name": "Vinix7",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q4HRlJypEw5XAn8H",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        448,
+        160
+      ],
+      "id": "80b3805b-258e-45d3-b2f9-22125a35a09d",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "fe7FB4OewPFVxszU",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fungsi untuk mengambil data secara aman dari node search\nconst getOrganicData = (nodeName) => {\n  try {\n    const results = $(nodeName).all();\n    // Mengambil array 'organic' dari hasil Serper API\n    return results[0].json.organic || [];\n  } catch (e) {\n    return []; // Jika node gagal, berikan array kosong agar workflow tidak stop\n  }\n};\n\nconst nfaResults = getOrganicData('NFA');\nconst bisaResults = getOrganicData('BISA AI');\nconst vinixResults = getOrganicData('Vinix7');\n\n// Gunakan DateTime.now() dari Luxon (bukan $now.format)\nconst currentTime = DateTime.now().toFormat('yyyy-MM-dd HH:mm');\n\n// Gabungkan dan berikan label brand ke setiap berita\nconst finalData = [\n  ...nfaResults.map(i => ({ json: { ...i, brand: 'NF Academy', processedAt: currentTime } })),\n  ...bisaResults.map(i => ({ json: { ...i, brand: 'BISA AI', processedAt: currentTime } })),\n  ...vinixResults.map(i => ({ json: { ...i, brand: 'Vinix 7', processedAt: currentTime } }))\n];\n\nreturn finalData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -48
+      ],
+      "id": "5c1a9624-89c7-43fc-8136-ae4c4a50df23",
+      "name": "Gabungkan Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mengambil seluruh item dari node sebelumnya\nconst allItems = $input.all();\nconst total = allItems.length;\n\n// Menghitung mention per brand secara total\nconst counts = {\n  nfa: allItems.filter(i => i.json.brand === \"NF Academy\").length,\n  bisa: allItems.filter(i => i.json.brand === \"BISA AI\").length,\n  vinix: allItems.filter(i => i.json.brand === \"Vinix 7\").length\n};\n\n// Menghitung Share of Voice (SOV)\nconst sov = {\n  nfa: total > 0 ? ((counts.nfa / total) * 100).toFixed(1) : 0,\n  bisa: total > 0 ? ((counts.bisa / total) * 100).toFixed(1) : 0,\n  vinix: total > 0 ? ((counts.vinix / total) * 100).toFixed(1) : 0\n};\n\n// Menggabungkan seluruh teks berita menjadi satu blok teks untuk AI\nlet combinedText = \"\";\nallItems.forEach(item => {\n  combinedText += `[${item.json.brand}] ${item.json.title}: ${item.json.snippet}\\n\\n`;\n});\n\n// PENTING: Mengembalikan HANYA SATU objek (bukan array)\nreturn {\n  metrics: {\n    processedAt: DateTime.now().toFormat('yyyy-MM-dd HH:mm'),\n    total_mentions: total,\n    breakdown: counts,\n    share_of_voice: sov,\n    dashboard_url: \"https://docs.google.com/spreadsheets/d/19yDBpx981bYwOzIKD7oxHG80YdfDqY_ZUmVyCIYbXNU/edit\"\n  },\n  text_for_ai: combinedText\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -48
+      ],
+      "id": "3e13f09b-19b5-48c7-8aca-4a3b310d5988",
+      "name": "Menyiapkan Teks AI"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Lakukan analisis kompetitif berdasarkan DATA METRICS berikut:\n- Total Mentions: {{ $json.metrics.total_mentions }}\n- NF Academy: {{ $json.metrics.breakdown.nfa }} mention ({{ $json.metrics.share_of_voice.nfa }}%)\n- BISA AI: {{ $json.metrics.breakdown.bisa }} mention ({{ $json.metrics.share_of_voice.bisa }}%)\n- Vinix 7: {{ $json.metrics.breakdown.vinix }} mention ({{ $json.metrics.share_of_voice.vinix }}%)\n\nDATA MENTAH:\n{{ $json.text_for_ai }}\n\nTugas Anda:\n1. Mengapa Share of Voice [Brand Tertinggi] lebih besar?\n2. Berikan skor reputasi 1-10 untuk NF Academy dibandingkan kompetitor berdasarkan kualitas snippet tersebut.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Anda adalah pakar Strategi Bisnis dan analis Intelijen ompetitif. Tugas Anda adalah mengalanisis data mention dari internet untuk membandingkan brand NF Academy (milik pengguna) dengan kompotitornya (BISA AI dan Vinix 7) fokus pada sentimen,tren fitur dan peluang pasar"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        512,
+        -48
+      ],
+      "id": "2068a62f-3b88-4cf6-a696-c305a725c722",
+      "name": "Prompt untuk perbandingan"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1F6ed_wAeBTALSc-aKk_xNg_GonCToLa2JEDAhP-CWEc",
+          "mode": "list",
+          "cachedResultName": "Workflow Analisis Brand dan Kompotiter",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F6ed_wAeBTALSc-aKk_xNg_GonCToLa2JEDAhP-CWEc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1F6ed_wAeBTALSc-aKk_xNg_GonCToLa2JEDAhP-CWEc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tanggal": "={{ $('Menyiapkan Teks AI').item.json.metrics.processedAt }}",
+            "NF Academy": "={{ $('Menyiapkan Teks AI').item.json.metrics.breakdown.nfa }}",
+            "BISA AI": "={{ $('Menyiapkan Teks AI').item.json.metrics.breakdown.bisa }}",
+            "Vinix 7": "={{ $('Menyiapkan Teks AI').item.json.metrics.breakdown.vinix }}",
+            "Total Mention": "={{ $('Menyiapkan Teks AI').item.json.metrics.total_mentions }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Tanggal",
+              "displayName": "Tanggal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "NF Academy",
+              "displayName": "NF Academy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "BISA AI",
+              "displayName": "BISA AI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Vinix 7",
+              "displayName": "Vinix 7",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total Mention",
+              "displayName": "Total Mention",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        -48
+      ],
+      "id": "de6c7c46-abfa-4eb9-b3d0-47d732760ee1",
+      "name": "Mencatat Hasil",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "oV0ZPaGsfxLjCL1t",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n  <title>Laporan Strategi Bisnis & Intelijen Kompetitif</title>\n\n  <style>\n    :root {\n      --orange: #FF6B35;\n      --blue: #2E5AAC;\n      --blue-light: #4A7DCC;\n      --gray-bg: #f8f9fa;\n      --text-dark: #333;\n      --text-light: #6c757d;\n    }\n\n    * {\n      margin: 0;\n      padding: 0;\n      box-sizing: border-box;\n    }\n\n    body {\n      font-family: Arial, Helvetica, sans-serif;\n      line-height: 1.6;\n      color: var(--text-dark);\n      background: #ffffff;\n    }\n\n    .container {\n      max-width: 1000px;\n      margin: 0 auto;\n      padding: 24px;\n    }\n\n    header {\n      background: linear-gradient(135deg, var(--blue), var(--blue-light));\n      color: white;\n      padding: 48px 24px;\n      text-align: center;\n      border-radius: 0 0 14px 14px;\n    }\n\n    header h1 {\n      font-size: 28px;\n      font-weight: bold;\n      margin-bottom: 10px;\n    }\n\n    header p {\n      font-size: 15px;\n      opacity: 0.95;\n    }\n\n    .badge {\n      display: inline-block;\n      margin-top: 12px;\n      background: var(--orange);\n      padding: 6px 14px;\n      border-radius: 20px;\n      font-size: 13px;\n      font-weight: bold;\n    }\n\n    section {\n      background: #ffffff;\n      margin: 32px 0;\n      padding: 28px;\n      border-radius: 12px;\n      border: 1px solid #eee;\n    }\n\n    h2 {\n      font-size: 22px;\n      color: var(--blue);\n      margin-bottom: 18px;\n      padding-bottom: 8px;\n      border-bottom: 2px solid var(--orange);\n    }\n\n    h3 {\n      font-size: 18px;\n      color: var(--blue);\n      margin: 18px 0 10px;\n    }\n\n    p {\n      margin-bottom: 12px;\n    }\n\n    ul, ol {\n      margin-left: 22px;\n    }\n\n    li {\n      margin-bottom: 10px;\n    }\n\n    .highlight {\n      background: #fff4e6;\n      padding: 2px 6px;\n      border-radius: 4px;\n      font-weight: bold;\n      color: #d35400;\n    }\n\n    /* Table */\n    table {\n      width: 100%;\n      border-collapse: collapse;\n      margin-top: 16px;\n    }\n\n    th {\n      background: var(--blue);\n      color: white;\n      padding: 12px;\n      font-size: 14px;\n    }\n\n    td {\n      padding: 12px;\n      border-bottom: 1px solid #eee;\n      font-size: 14px;\n      vertical-align: top;\n    }\n\n    .brand-bisa { background: #fff7f1; }\n    .brand-nf { background: #f1f6ff; }\n    .brand-vinix { background: #fafafa; color: #999; }\n\n    .score-bisa { color: var(--orange); font-weight: bold; }\n    .score-nf { color: var(--blue); font-weight: bold; }\n\n    .bar {\n      height: 18px;\n      border-radius: 10px;\n      margin: 6px 0 14px;\n      background: #ddd;\n      overflow: hidden;\n    }\n\n    .bar span {\n      display: block;\n      height: 100%;\n    }\n\n    .bar-bisa span { width: 53.3%; background: var(--orange); }\n    .bar-nf span { width: 46.7%; background: var(--blue); }\n\n    footer {\n      margin-top: 40px;\n      text-align: center;\n      font-size: 13px;\n      color: var(--text-light);\n    }\n\n    @media print {\n      section { page-break-inside: avoid; }\n    }\n  </style>\n</head>\n\n<body>\n\n<header>\n  <div class=\"container\">\n    <h1>📊 Laporan Strategi Bisnis & Intelijen Kompetitif</h1>\n    <p>Analisis Share of Voice (SoV) & Reputasi Digital</p>\n    <div class=\"badge\">📅 07 Januari 2026</div>\n  </div>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        1072,
+        -48
+      ],
+      "id": "0197ef4a-73f6-4828-ba7c-65b42293bf07",
+      "name": "Generate HTML"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdfshift.io/v3/convert/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "sk_87e722a69997170ff54c0d95fe5fe62119a9fb1b"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source",
+              "value": "={{ $json.html }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1280,
+        -48
+      ],
+      "id": "c7c42d07-af83-4002-bbaf-4f1765c9163e",
+      "name": "HTML to PDF"
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "1315189308",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📊 *Laporan Intelijen Kompetitif - 07 Januari 2026*\n\n• BISA AI unggul tipis dengan SoV 53.3%\n• NF Academy perlu optimasi konten dinamis\n• Vinix 7: belum terdeteksi - masalah awareness!\n\n📎 Lampiran: PDF lengkap analisis & rekomendasi strategis.",
+          "fileName": "Laporan Kompetitor - 02 Februari 2026"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1488,
+        -48
+      ],
+      "id": "bf8b8166-8839-437e-827e-2b5b68695129",
+      "name": "Kirim PDF ke Telegram",
+      "webhookId": "afbc255f-a68b-474b-b5f7-09859b925677",
+      "credentials": {
+        "telegramApi": {
+          "id": "GzF8LJop6zaeNUM9",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-04-10T10:51:24.759+07:00",
+          "Readable date": "April 10th 2026, 10:51:24 am",
+          "Readable time": "10:51:24 am",
+          "Day of week": "Friday",
+          "Year": "2026",
+          "Month": "April",
+          "Day of month": "10",
+          "Hour": "10",
+          "Minute": "51",
+          "Second": "24",
+          "Timezone": "Asia/Jakarta (UTC+07:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "NFA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bisa AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Vinix7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NFA": {
+      "main": [
+        [
+          {
+            "node": "Gabungkan Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bisa AI": {
+      "main": [
+        [
+          {
+            "node": "Gabungkan Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vinix7": {
+      "main": [
+        [
+          {
+            "node": "Gabungkan Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt untuk perbandingan",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gabungkan Data": {
+      "main": [
+        [
+          {
+            "node": "Menyiapkan Teks AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Menyiapkan Teks AI": {
+      "main": [
+        [
+          {
+            "node": "Prompt untuk perbandingan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt untuk perbandingan": {
+      "main": [
+        [
+          {
+            "node": "Mencatat Hasil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mencatat Hasil": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML": {
+      "main": [
+        [
+          {
+            "node": "HTML to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML to PDF": {
+      "main": [
+        [
+          {
+            "node": "Kirim PDF ke Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "62c282cd-652c-41f7-ab4e-848cc07b93e3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a82a83e928bd86ebee645190c3e8e8e720bb96438d836d91e81f6558b87cee59"
+  },
+  "id": "xpgfqYmLPurnv3Mv",
+  "tags": []
+}
